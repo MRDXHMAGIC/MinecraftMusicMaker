@@ -14,6 +14,14 @@ def sys_call_exit():
 def set_max_thread_num(n):
     global_info["max_thread_num"] = int(n)
 
+def set_sample_rate(n):
+    if n == "1":
+        global_info["sample_rate"] = 16000
+    elif n == "2":
+        global_info["sample_rate"] = 44100
+    elif n == "3":
+        global_info["sample_rate"] = 48000
+
 def ask_filename():
     i = filedialog.askopenfilename(title="MinecraftMusicMaker", filetypes=[("MIDI Files", ".mid")])
     if i:
@@ -23,9 +31,9 @@ def start_task():
     if global_info["thread_num"] == 0:
         global_info["log"] = []
         global_info["task_name"] = os.path.splitext(os.path.basename(gui_file_path.get()))[0]
-        threading.Thread(target=convertor, args=(gui_file_path.get(), global_info["sound_font"], global_info["max_thread_num"])).start()
+        threading.Thread(target=convertor, args=(gui_file_path.get(), global_info["sound_font"], global_info["max_thread_num"], global_info["sample_rate"])).start()
 
-def make_track(note_text, note_num, track_num):
+def make_track(note_text, note_num, part_num):
     global_info["thread_num"] += 1
     try:
         for n in range(note_num):
@@ -33,10 +41,10 @@ def make_track(note_text, note_num, track_num):
 
         note_text += " amix=inputs=" + str(note_num) + ":duration=longest:normalize=0"
 
-        with open("Cache/cmd_" + str(track_num), "w") as io:
+        with open("Cache/cmd_" + str(part_num), "w") as io:
             io.write(note_text)
 
-        task = subprocess.Popen("ffmpeg -i " + global_info["file_position"] + "/Asset/audio/harp.ogg -i " + global_info["file_position"] + "/Asset/audio/pling.ogg -i " + global_info["file_position"] + "/Asset/audio/bass.ogg -i " + global_info["file_position"] + "/Asset/audio/guitar.ogg -i " + global_info["file_position"] + "/Asset/audio/bit.ogg -i " + global_info["file_position"] + "/Asset/audio/hat.ogg -i " + global_info["file_position"] + "/Asset/audio/snare.ogg -i " + global_info["file_position"] + "/Asset/audio/basedrum.ogg -i " + global_info["file_position"] + "/Asset/audio/bell.ogg -i " + global_info["file_position"] + "/Asset/audio/cowbell.ogg -i " + global_info["file_position"] + "/Asset/audio/flute.ogg -i " + global_info["file_position"] + "/Asset/audio/sand.ogg -i " + global_info["file_position"] + "/Asset/audio/iron_xylophone.ogg -i " + global_info["file_position"] + "/Asset/audio/xylophone.ogg -i " + global_info["file_position"] + "/Asset/audio/chime.ogg -i " + global_info["file_position"] + "/Asset/audio/didgeridoo.ogg -/filter_complex " + global_info["file_position"] + "/Cache/cmd_" + str(track_num) + " \"" + global_info["file_position"] + "/Cache/Track_" + str(track_num) + ".wav\"", stderr=subprocess.STDOUT, stdout=subprocess.PIPE, shell=True)
+        task = subprocess.Popen(global_info["file_position"] + "/Asset/ffmpeg/bin/ffmpeg.exe -i \"" + global_info["file_position"] + "/Asset/audio/harp.ogg\" -i \"" + global_info["file_position"] + "/Asset/audio/pling.ogg\" -i \"" + global_info["file_position"] + "/Asset/audio/bass.ogg\" -i \"" + global_info["file_position"] + "/Asset/audio/guitar.ogg\" -i \"" + global_info["file_position"] + "/Asset/audio/bit.ogg\" -i \"" + global_info["file_position"] + "/Asset/audio/hat.ogg\" -i \"" + global_info["file_position"] + "/Asset/audio/snare.ogg\" -i \"" + global_info["file_position"] + "/Asset/audio/basedrum.ogg\" -i \"" + global_info["file_position"] + "/Asset/audio/bell.ogg\" -i \"" + global_info["file_position"] + "/Asset/audio/cowbell.ogg\" -i \"" + global_info["file_position"] + "/Asset/audio/flute.ogg\" -i \"" + global_info["file_position"] + "/Asset/audio/sand.ogg\" -i \"" + global_info["file_position"] + "/Asset/audio/iron_xylophone.ogg\" -i \"" + global_info["file_position"] + "/Asset/audio/xylophone.ogg\" -i \"" + global_info["file_position"] + "/Asset/audio/chime.ogg\" -i \"" + global_info["file_position"] + "/Asset/audio/didgeridoo.ogg\" -/filter_complex \"" + global_info["file_position"] + "/Cache/cmd_\"" + str(part_num) + " \"" + global_info["file_position"] + "/Cache/Part_" + str(part_num) + ".wav\"", stderr=subprocess.STDOUT, stdout=subprocess.PIPE, shell=True)
         for output_line in task.stdout:
             global_info["log"] += output_line.decode().splitlines()
             global_info["refresh_log"] = True
@@ -47,21 +55,22 @@ def make_track(note_text, note_num, track_num):
     finally:
         global_info["thread_num"] -= 1
 
-def convertor(midi_path, sound_font, thread_num):
+def convertor(midi_path, sound_font, thread_num, sample_rate):
     try:
-        global_info["task_state"] = "Analysing..."
+        global_info["task_state"] = "Loading..."
         if os.path.exists("Cache"):
             shutil.rmtree("Cache")
         os.mkdir("Cache")
 
         mid = mido.MidiFile(midi_path, clip=True)
 
+        note_num = 0
+        part_num = 0
         info_list = {}
-        tempo_list = [(0, 500000), (float("INF"), 0)]
+        note_text = ""
         global_info["thread_num"] = 0
-        for track_num, track in enumerate(mid.tracks):
-            note_num = 0
-            note_text = ""
+        tempo_list = [(0, 500000), (float("INF"), 0)]
+        for track in mid.tracks:
             source_time = 0
             global_info["task_state"] = "Analysing..."
             for msg in track:
@@ -107,7 +116,7 @@ def convertor(midi_path, sound_font, thread_num):
                     note = msg.note
                     channel = msg.channel
                     velocity = msg.velocity
-                    if velocity != 0 and 21 <= note <= 108:
+                    if velocity != 0 and (channel == 9 or 21 <= note <= 108):
                         if channel not in info_list:
                             info_list[channel] = {"program": [(float("INF"), "")], "volume": [(float("INF"), 1)]}
 
@@ -146,23 +155,38 @@ def convertor(midi_path, sound_font, thread_num):
                                 tick_time += mido.tick2second(source_time - tempo_list[n - 1][0], mid.ticks_per_beat, tempo_list[n - 1][1]) * 1000
                                 break
 
-                        note_text += "[" + str(program) + ":a] aresample=16000, asetrate=16000*" + str(pitch) + ", aresample=16000, volume=" + str(round(velocity, 2)) + ", adelay=" + str(round(tick_time, 2)) + ":all=1, asetpts=PTS-STARTPTS [A_" + str(note_num) + "]; "
+                        note_text += "[" + str(program) + ":a] aresample=" + str(sample_rate) + ", asetrate=" + str(sample_rate) + "*" + str(pitch) + ", aresample=" + str(sample_rate) + ", volume=" + str(round(velocity, 2)) + ", adelay=" + str(round(tick_time, 2)) + ":all=1, asetpts=PTS-STARTPTS [A_" + str(note_num) + "]; "
                         note_num += 1
 
-            global_info["task_state"] = "Processing..."
+                        if note_num > 300:
+                            global_info["task_state"] = "Processing..."
 
-            while global_info["thread_num"] >= thread_num:
-                pass
+                            while global_info["thread_num"] >= thread_num:
+                                pass
 
-            if note_num:
-                threading.Thread(target=make_track, args=(note_text, note_num, track_num)).start()
+                            if note_num:
+                                threading.Thread(target=make_track, args=(note_text, note_num, part_num)).start()
+
+                            part_num += 1
+                            note_num = 0
+                            note_text = ""
+
+                            global_info["task_state"] = "Analyzing..."
+
+        global_info["task_state"] = "Processing..."
+
+        while global_info["thread_num"] >= thread_num:
+            pass
+
+        if note_num:
+            threading.Thread(target=make_track, args=(note_text, note_num, part_num)).start()
 
         while global_info["thread_num"] != 0:
             pass
 
         global_info["task_state"] = "Mixing..."
 
-        command = "ffmpeg "
+        command = global_info["file_position"] + "/Asset/ffmpeg/bin/ffmpeg.exe -y "
         note_text = ""
         track_num = 0
         for i in os.listdir("Cache"):
@@ -171,7 +195,7 @@ def convertor(midi_path, sound_font, thread_num):
                 track_num += 1
 
         for n in range(track_num):
-            note_text += "[" + str(n) + ":a] aresample=16000, asetpts=PTS-STARTPTS [A_" + str(n) + "]; "
+            note_text += "[" + str(n) + ":a] aresample=" + str(sample_rate) + ", asetpts=PTS-STARTPTS [A_" + str(n) + "]; "
 
         for n in range(track_num):
             note_text += "[A_" + str(n) + "]"
@@ -181,20 +205,25 @@ def convertor(midi_path, sound_font, thread_num):
         with open("Cache/cmd", "w") as io:
             io.write(note_text)
 
-        task = subprocess.Popen(command + " -/filter_complex " + global_info["file_position"] + "/Cache/cmd \"" + global_info["file_position"] + "/Cache/audio.wav\"", stderr=subprocess.STDOUT, stdout=subprocess.PIPE, shell=True)
-        for output_line in task.stdout:
-            global_info["log"] += output_line.decode().splitlines()
-            global_info["refresh_log"] = True
-        task.wait()
         global_info["task_state"] = "Saving..."
+        global_info["save_path"] = None
+
+        while global_info["save_path"] is None:
+            pass
+
+        if global_info["save_path"]:
+            task = subprocess.Popen(command + " -/filter_complex \"" + global_info["file_position"] + "/Cache/cmd\" \"" + global_info["save_path"] + "\"", stderr=subprocess.STDOUT, stdout=subprocess.PIPE, shell=True)
+            for output_line in task.stdout:
+                global_info["log"] += output_line.decode().splitlines()
+                global_info["refresh_log"] = True
+            task.wait()
     except:
         global_info["log"] += traceback.format_exc().splitlines()
         global_info["refresh_log"] = True
     finally:
-        if global_info["task_state"] != "Saving...":
-            global_info["task_state"] = "Error"
+        global_info["task_state"] = "Process finished"
 
-global_info = {"max_thread_num": 1, "thread_num": 0, "file_position": os.path.abspath(""), "task_state": "Process finished", "task_name": "", "refresh_log": True, "log": []}
+global_info = {"max_thread_num": 1, "thread_num": 0, "file_position": os.path.abspath(""), "save_path": None, "task_state": "Process finished", "task_name": "", "refresh_log": True, "log": [], "sample_rate": 16000}
 
 with open("Asset/text/default.json", "rb") as f:
     global_info["sound_font"] = json.loads(f.read())
@@ -210,29 +239,34 @@ tk_window.protocol("WM_DELETE_WINDOW", sys_call_exit)
 gui_log = tkinter.StringVar()
 gui_info1 = tkinter.StringVar()
 gui_info2 = tkinter.StringVar()
+gui_info3 = tkinter.StringVar()
 gui_file_path = tkinter.StringVar()
 gui_file_path.set("")
-tkinter.Label(tk_window, textvariable=gui_info1).place(x=10, y=80)
-tkinter.Label(tk_window, textvariable=gui_info2).place(x=220, y=80)
+tkinter.Label(tk_window, textvariable=gui_info1).place(x=115, y=80)
+tkinter.Label(tk_window, textvariable=gui_info2).place(x=450, y=80)
+tkinter.Label(tk_window, textvariable=gui_info3).place(x=310, y=80)
 tkinter.Entry(tk_window, width=100, textvariable=gui_file_path).place(x=10, y=10, height=30)
 tkinter.Button(tk_window, text="Browse...", width=8, command=ask_filename).place(x=724, y=10)
 tkinter.Button(tk_window, text="Start", width=110, command=start_task).place(x=10, y=50)
 tkinter.Label(tk_window, textvariable=gui_log, justify="left").place(x=10, y=102)
-scale_bar = tkinter.Scale(tk_window, from_=1, to=16, orient="horizontal", showvalue=False, command=set_max_thread_num)
-scale_bar.place(x=100, y=80)
+scale_bar1 = tkinter.Scale(tk_window, from_=1, to=16, orient="horizontal", showvalue=False, command=set_max_thread_num)
+scale_bar1.place(x=10, y=80)
+scale_bar2 = tkinter.Scale(tk_window, from_=1, to=3, orient="horizontal", showvalue=False, command=set_sample_rate)
+scale_bar2.place(x=200, y=80)
 
 while True:
     if global_info["task_state"] == "Saving...":
-        if save_path := filedialog.asksaveasfilename(title="MinecraftMusicMaker", initialfile=global_info["task_name"], filetypes=[("WAV Files", ".wav")], defaultextension=".wav"):
-            try:
-                shutil.move("Cache/audio.wav", save_path)
-            except:
-                global_info["log"] += traceback.format_exc().splitlines()
-                global_info["refresh_log"] = True
-        global_info["task_state"] = "Process finished"
+        global_info["save_path"] = filedialog.asksaveasfilename(title="MinecraftMusicMaker", initialfile=global_info["task_name"], filetypes=[("MP3 Files", ".mp3"), ("FLAC Files", ".flac"), ("OGG Files", ".ogg"), ("WAV Files", ".wav"), ("AAC Files", ".aac")], defaultextension=".mp3")
+        global_info["task_state"] = "Mixing"
     if global_info["refresh_log"]:
         global_info["refresh_log"] = False
         gui_log.set("\n".join(global_info["log"][-20:]))
     gui_info1.set("Thread: " + str(global_info["thread_num"]) + "/" + str(global_info["max_thread_num"]))
     gui_info2.set("State: " + str(global_info["task_state"]))
+    if global_info["sample_rate"] == 16000:
+        gui_info3.set("SampleRate: 16kHz")
+    elif global_info["sample_rate"] == 44100:
+        gui_info3.set("SampleRate: 44.1kHz")
+    elif global_info["sample_rate"] == 48000:
+        gui_info3.set("SampleRate: 48kHz")
     tk_window.update()
