@@ -1,19 +1,15 @@
 # MinecraftMusicMaker
 
-#### 介绍
-Use Minecraft Sounds to Make Audios.
+制作 Minecraft 红石音乐风格的音频
 
-#### 软件架构
-1. 使用Mido解析MIDI文件，Tkinter提供GUI，ffmpeg负责音频处理
+## 原理
 
+使用 Mido 解析MIDI文件， Tkinter 提供 GUI，ffmpeg 负责音频处理
 
-#### 安装与启动
+## 如何使用 (Windows)
 
-1.  解压发行的压缩包
-2.  在Windows下双击解压后的exe文件
-
-#### 使用说明
-
-1.  在文本框输入MIDI文件路径或点击Browse...选择
-2.  根据电脑配置调整Thread滑块，根据需求调整采样率
-3.  点击Start开始处理，处理可能需要一分钟时间请耐心等待
+1. 解压发行的压缩包
+2. 双击解压后的 .exe 文件
+3. 在文本框输入 MIDI 文件路径或点击 Browse... 选择
+4. 根据电脑配置调整 Thread 滑块，根据需求调整采样率
+5. 点击 Start 开始处理，处理可能需要几分钟时间，请耐心等待
