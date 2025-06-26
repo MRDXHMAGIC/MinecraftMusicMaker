@@ -2,6 +2,8 @@
 
 制作 Minecraft 红石音乐风格的音频
 
+![MMM_Icon](MinecraftMusicMaker_Icon.png)
+
 ## 原理
 
 使用 Mido 解析MIDI文件， Tkinter 提供 GUI，ffmpeg 负责音频处理
